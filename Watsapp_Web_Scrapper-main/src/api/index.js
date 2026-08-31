@@ -7,6 +7,7 @@ export const API_ENDPOINTS = {
   users: `${BASE_URL}/api/users`,
   qrLatest: `${BASE_URL}/api/qr/latest`,
   scrapedChats: `${BASE_URL}/api/scraped-chats`,
+  scrapedChatStats: `${BASE_URL}/api/scraped-chats/stats`,
   scrapedChatMessages: `${BASE_URL}/api/scraped-chats/messages`,
   scrapedChatsMonitor: `${BASE_URL}/api/scraped-chats/monitor`,
   scrapedChatsMonitored: `${BASE_URL}/api/scraped-chats/monitored`,
@@ -46,7 +47,16 @@ export const apiRequest = async (url, options = {}) => {
 }
 
 export const scrapedChatsApi = {
-  getChats: () => apiRequest(API_ENDPOINTS.scrapedChats),
+  getChats: ({ type, search, limit, offset } = {}) => {
+    const params = new URLSearchParams()
+    if (type) params.set('type', type)
+    if (search) params.set('search', search)
+    if (limit != null) params.set('limit', String(limit))
+    if (offset != null) params.set('offset', String(offset))
+    const qs = params.toString()
+    return apiRequest(`${API_ENDPOINTS.scrapedChats}${qs ? `?${qs}` : ''}`)
+  },
+  getChatStats: () => apiRequest(API_ENDPOINTS.scrapedChatStats),
   getMessages: (chatId) => {
     const params = new URLSearchParams({ chatId })
     return apiRequest(`${API_ENDPOINTS.scrapedChatMessages}?${params.toString()}`)

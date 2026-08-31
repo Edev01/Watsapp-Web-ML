@@ -138,6 +138,7 @@ const ScrapedChats = ({ setToast }) => {
   const [monitoringIds, setMonitoringIds] = useState([])
   const [error, setError] = useState('')
   const [messageError, setMessageError] = useState('')
+  const [chatStats, setChatStats] = useState({ total: 0, monitored: 0, unmonitored: 0 })
   const [lastSyncedAt, setLastSyncedAt] = useState('')
   const [showMobileMessages, setShowMobileMessages] = useState(false)
 
@@ -146,10 +147,7 @@ const ScrapedChats = ({ setToast }) => {
     [chats, selectedChatId]
   )
 
-  const monitoredCount = useMemo(
-    () => chats.filter(chat => chat.isMonitored).length,
-    [chats]
-  )
+  const monitoredCount = chatStats.monitored || chats.filter(chat => chat.isMonitored).length
 
   const selectedJidSet = useMemo(
     () => new Set(selectedJids),
@@ -182,38 +180,53 @@ const ScrapedChats = ({ setToast }) => {
     setLoadingChats(true)
     setError('')
 
-    const [allChatsResult, monitoredResult] = await Promise.allSettled([
-      scrapedChatsApi.getChats(),
-      scrapedChatsApi.getMonitoredChats(),
+    const chatRequests = chatFilter === 'monitored'
+      ? [scrapedChatsApi.getChats({ type: 'monitored', limit: 2000 })]
+      : [
+          scrapedChatsApi.getChats({ type: 'monitored', limit: 2000 }),
+          scrapedChatsApi.getChats({ type: 'chats', limit: 2000 }),
+        ]
+
+    const [statsResult, ...chatResults] = await Promise.allSettled([
+      scrapedChatsApi.getChatStats(),
+      ...chatRequests,
     ])
 
-    const allChats = allChatsResult.status === 'fulfilled'
-      ? extractList(allChatsResult.value).map(normalizeChat).filter(chat => chat.jid)
-      : []
+    if (statsResult.status === 'fulfilled') {
+      const stats = statsResult.value?.data || statsResult.value || {}
+      setChatStats({
+        total: Number(stats.total) || 0,
+        monitored: Number(stats.monitored) || 0,
+        unmonitored: Number(stats.unmonitored) || 0,
+      })
+    }
 
-    const monitoredChats = monitoredResult.status === 'fulfilled'
-      ? extractList(monitoredResult.value).map(normalizeChat).filter(chat => chat.jid)
-      : []
+    const mergedByJid = new Map()
 
-    const monitoredIds = new Set(monitoredChats.map(chat => chat.jid))
-    const knownIds = new Set(allChats.map(chat => chat.jid))
+    for (const result of chatResults) {
+      if (result.status !== 'fulfilled') continue
+      const list = extractList(result.value).map(normalizeChat).filter(chat => chat.jid)
+      for (const chat of list) {
+        const existing = mergedByJid.get(chat.jid)
+        mergedByJid.set(chat.jid, {
+          ...existing,
+          ...chat,
+          isMonitored: Boolean(existing?.isMonitored || chat.isMonitored),
+        })
+      }
+    }
 
-    const mergedChats = [
-      ...allChats.map(chat => ({
-        ...chat,
-        isMonitored: chat.isMonitored || monitoredIds.has(chat.jid),
-      })),
-      ...monitoredChats
-        .filter(chat => !knownIds.has(chat.jid))
-        .map(chat => ({ ...chat, isMonitored: true })),
-    ]
+    const mergedChats = Array.from(mergedByJid.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    )
 
     setChats(mergedChats)
     setLastSyncedAt(new Date().toISOString())
     setSelectedJids(prev => prev.filter(id => mergedChats.some(chat => chat.jid === id && !chat.isMonitored)))
 
-    if (allChatsResult.status === 'rejected' && monitoredResult.status === 'rejected') {
-      setError(allChatsResult.reason?.message || 'Failed to load scraped chats')
+    if (chatResults.every((result) => result.status === 'rejected')) {
+      const firstError = chatResults.find((result) => result.status === 'rejected')
+      setError(firstError?.reason?.message || 'Failed to load scraped chats')
     }
 
     setSelectedChatId(prev => {
@@ -222,7 +235,7 @@ const ScrapedChats = ({ setToast }) => {
     })
 
     setLoadingChats(false)
-  }, [])
+  }, [chatFilter])
 
   const loadMessages = useCallback(async (chatId) => {
     if (!chatId) {
@@ -347,8 +360,8 @@ const ScrapedChats = ({ setToast }) => {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <StatBox label="Total chats" value={chats.length} sub="From scraped chats API" />
-        <StatBox label="Monitored" value={monitoredCount} sub="Tracked by monitor API" />
+        <StatBox label="Total chats" value={chatStats.total || chats.length} sub="Filtered server-side by type" />
+        <StatBox label="Monitored" value={monitoredCount} sub="type=monitored" />
         <StatBox label="Messages" value={messages.length} sub={selectedChat?.name || 'Select a chat'} />
         <StatBox label="Last sync" value={lastSyncedAt ? formatDateTime(lastSyncedAt) : 'Pending'} sub="Dashboard refresh time" />
       </div>
