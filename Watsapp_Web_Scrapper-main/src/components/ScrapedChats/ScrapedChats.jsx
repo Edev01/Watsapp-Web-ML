@@ -1,22 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { API_ENDPOINTS, scrapedChatsApi } from '../../api'
 
-const CHAT_PAGE_SIZE = 50
-
-const extractPagination = (payload) => {
-  const data = payload?.data || payload || {}
-  return data.pagination || {
-    page: 1,
-    pageSize: CHAT_PAGE_SIZE,
-    total: data.total || 0,
-    totalPages: 1,
-    hasNext: Boolean(data.hasMore),
-    hasPrev: false,
-    nextPage: null,
-    prevPage: null,
-  }
-}
-
 const extractList = (payload) => {
   if (Array.isArray(payload)) return payload
   if (Array.isArray(payload?.data)) return payload.data
@@ -155,15 +139,6 @@ const ScrapedChats = ({ setToast }) => {
   const [error, setError] = useState('')
   const [messageError, setMessageError] = useState('')
   const [chatStats, setChatStats] = useState({ total: 0, monitored: 0, unmonitored: 0 })
-  const [chatPage, setChatPage] = useState(1)
-  const [chatPagination, setChatPagination] = useState({
-    page: 1,
-    pageSize: CHAT_PAGE_SIZE,
-    total: 0,
-    totalPages: 0,
-    hasNext: false,
-    hasPrev: false,
-  })
   const [lastSyncedAt, setLastSyncedAt] = useState('')
   const [showMobileMessages, setShowMobileMessages] = useState(false)
 
@@ -201,7 +176,7 @@ const ScrapedChats = ({ setToast }) => {
   const allVisibleSelected = selectableVisibleChats.length > 0
     && selectableVisibleChats.every(chat => selectedJidSet.has(chat.jid))
 
-  const loadChats = useCallback(async (page = chatPage) => {
+  const loadChats = useCallback(async () => {
     setLoadingChats(true)
     setError('')
 
@@ -209,11 +184,7 @@ const ScrapedChats = ({ setToast }) => {
 
     const [statsResult, chatsResult] = await Promise.allSettled([
       scrapedChatsApi.getChatStats(),
-      scrapedChatsApi.getChats({
-        type: listType,
-        page,
-        pageSize: CHAT_PAGE_SIZE,
-      }),
+      scrapedChatsApi.getChats({ type: listType }),
     ])
 
     if (statsResult.status === 'fulfilled') {
@@ -226,11 +197,8 @@ const ScrapedChats = ({ setToast }) => {
     }
 
     if (chatsResult.status === 'fulfilled') {
-      const pagination = extractPagination(chatsResult.value)
       const list = extractList(chatsResult.value).map(normalizeChat).filter(chat => chat.jid)
       setChats(list)
-      setChatPagination(pagination)
-      setChatPage(pagination.page || page)
       setLastSyncedAt(new Date().toISOString())
       setSelectedJids(prev => prev.filter(id => list.some(chat => chat.jid === id && !chat.isMonitored)))
       setSelectedChatId(prev => {
@@ -267,12 +235,8 @@ const ScrapedChats = ({ setToast }) => {
   }, [])
 
   useEffect(() => {
-    setChatPage(1)
-  }, [chatFilter])
-
-  useEffect(() => {
-    loadChats(chatPage)
-  }, [chatPage, loadChats])
+    loadChats()
+  }, [loadChats])
 
   useEffect(() => {
     loadMessages(selectedChatId)
@@ -311,7 +275,7 @@ const ScrapedChats = ({ setToast }) => {
       await scrapedChatsApi.monitorChats(jidsToMonitor)
       setToast?.({ type: 'success', message: `${jidsToMonitor.length} chat${jidsToMonitor.length > 1 ? 's' : ''} added to monitored chats` })
       setSelectedJids([])
-      await loadChats(chatPage)
+      await loadChats()
     } catch (err) {
       setToast?.({ type: 'error', message: err.message || 'Failed to monitor selected chats' })
     } finally {
@@ -359,7 +323,7 @@ const ScrapedChats = ({ setToast }) => {
 
           <button
             type="button"
-            onClick={() => loadChats(chatPage)}
+            onClick={loadChats}
             disabled={loadingChats}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-700 text-white text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-600 disabled:opacity-60 transition-colors"
           >
@@ -401,10 +365,7 @@ const ScrapedChats = ({ setToast }) => {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => {
-                    setChatFilter(item.id)
-                    setChatPage(1)
-                  }}
+                  onClick={() => setChatFilter(item.id)}
                   className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
                     chatFilter === item.id
                       ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-sm'
@@ -554,33 +515,6 @@ const ScrapedChats = ({ setToast }) => {
               </div>
             )}
           </div>
-
-          {!loadingChats && chatPagination.totalPages > 1 && (
-            <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3 bg-white dark:bg-slate-800">
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Page {chatPagination.page} of {chatPagination.totalPages}
-                <span className="hidden sm:inline"> · {chatPagination.total} chats</span>
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={!chatPagination.hasPrev || loadingChats}
-                  onClick={() => setChatPage(prev => Math.max(prev - 1, 1))}
-                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                >
-                  Prev
-                </button>
-                <button
-                  type="button"
-                  disabled={!chatPagination.hasNext || loadingChats}
-                  onClick={() => setChatPage(prev => prev + 1)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
         </section>
 
         <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${
