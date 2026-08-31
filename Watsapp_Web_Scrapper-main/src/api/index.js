@@ -47,10 +47,12 @@ export const apiRequest = async (url, options = {}) => {
 }
 
 export const scrapedChatsApi = {
-  getChats: ({ type, search, limit, offset } = {}) => {
+  getChats: ({ type, search, limit, offset, page, pageSize } = {}) => {
     const params = new URLSearchParams()
     if (type) params.set('type', type)
     if (search) params.set('search', search)
+    if (page != null) params.set('page', String(page))
+    if (pageSize != null) params.set('pageSize', String(pageSize))
     if (limit != null) params.set('limit', String(limit))
     if (offset != null) params.set('offset', String(offset))
     const qs = params.toString()

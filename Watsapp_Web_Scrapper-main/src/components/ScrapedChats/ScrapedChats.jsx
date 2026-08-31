@@ -1,6 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { API_ENDPOINTS, scrapedChatsApi } from '../../api'
 
+const CHAT_PAGE_SIZE = 50
+
+const extractPagination = (payload) => {
+  const data = payload?.data || payload || {}
+  return data.pagination || {
+    page: 1,
+    pageSize: CHAT_PAGE_SIZE,
+    total: data.total || 0,
+    totalPages: 1,
+    hasNext: Boolean(data.hasMore),
+    hasPrev: false,
+    nextPage: null,
+    prevPage: null,
+  }
+}
+
 const extractList = (payload) => {
   if (Array.isArray(payload)) return payload
   if (Array.isArray(payload?.data)) return payload.data
@@ -139,6 +155,15 @@ const ScrapedChats = ({ setToast }) => {
   const [error, setError] = useState('')
   const [messageError, setMessageError] = useState('')
   const [chatStats, setChatStats] = useState({ total: 0, monitored: 0, unmonitored: 0 })
+  const [chatPage, setChatPage] = useState(1)
+  const [chatPagination, setChatPagination] = useState({
+    page: 1,
+    pageSize: CHAT_PAGE_SIZE,
+    total: 0,
+    totalPages: 0,
+    hasNext: false,
+    hasPrev: false,
+  })
   const [lastSyncedAt, setLastSyncedAt] = useState('')
   const [showMobileMessages, setShowMobileMessages] = useState(false)
 
@@ -176,20 +201,19 @@ const ScrapedChats = ({ setToast }) => {
   const allVisibleSelected = selectableVisibleChats.length > 0
     && selectableVisibleChats.every(chat => selectedJidSet.has(chat.jid))
 
-  const loadChats = useCallback(async () => {
+  const loadChats = useCallback(async (page = chatPage) => {
     setLoadingChats(true)
     setError('')
 
-    const chatRequests = chatFilter === 'monitored'
-      ? [scrapedChatsApi.getChats({ type: 'monitored', limit: 2000 })]
-      : [
-          scrapedChatsApi.getChats({ type: 'monitored', limit: 2000 }),
-          scrapedChatsApi.getChats({ type: 'chats', limit: 2000 }),
-        ]
+    const listType = chatFilter === 'monitored' ? 'monitored' : 'all'
 
-    const [statsResult, ...chatResults] = await Promise.allSettled([
+    const [statsResult, chatsResult] = await Promise.allSettled([
       scrapedChatsApi.getChatStats(),
-      ...chatRequests,
+      scrapedChatsApi.getChats({
+        type: listType,
+        page,
+        pageSize: CHAT_PAGE_SIZE,
+      }),
     ])
 
     if (statsResult.status === 'fulfilled') {
@@ -201,38 +225,22 @@ const ScrapedChats = ({ setToast }) => {
       })
     }
 
-    const mergedByJid = new Map()
-
-    for (const result of chatResults) {
-      if (result.status !== 'fulfilled') continue
-      const list = extractList(result.value).map(normalizeChat).filter(chat => chat.jid)
-      for (const chat of list) {
-        const existing = mergedByJid.get(chat.jid)
-        mergedByJid.set(chat.jid, {
-          ...existing,
-          ...chat,
-          isMonitored: Boolean(existing?.isMonitored || chat.isMonitored),
-        })
-      }
+    if (chatsResult.status === 'fulfilled') {
+      const pagination = extractPagination(chatsResult.value)
+      const list = extractList(chatsResult.value).map(normalizeChat).filter(chat => chat.jid)
+      setChats(list)
+      setChatPagination(pagination)
+      setChatPage(pagination.page || page)
+      setLastSyncedAt(new Date().toISOString())
+      setSelectedJids(prev => prev.filter(id => list.some(chat => chat.jid === id && !chat.isMonitored)))
+      setSelectedChatId(prev => {
+        if (prev && list.some(chat => chat.jid === prev)) return prev
+        return list[0]?.jid || ''
+      })
+    } else {
+      setChats([])
+      setError(chatsResult.reason?.message || 'Failed to load scraped chats')
     }
-
-    const mergedChats = Array.from(mergedByJid.values()).sort((a, b) =>
-      a.name.localeCompare(b.name)
-    )
-
-    setChats(mergedChats)
-    setLastSyncedAt(new Date().toISOString())
-    setSelectedJids(prev => prev.filter(id => mergedChats.some(chat => chat.jid === id && !chat.isMonitored)))
-
-    if (chatResults.every((result) => result.status === 'rejected')) {
-      const firstError = chatResults.find((result) => result.status === 'rejected')
-      setError(firstError?.reason?.message || 'Failed to load scraped chats')
-    }
-
-    setSelectedChatId(prev => {
-      if (prev && mergedChats.some(chat => chat.jid === prev)) return prev
-      return mergedChats[0]?.jid || ''
-    })
 
     setLoadingChats(false)
   }, [chatFilter])
@@ -259,8 +267,12 @@ const ScrapedChats = ({ setToast }) => {
   }, [])
 
   useEffect(() => {
-    loadChats()
-  }, [loadChats])
+    setChatPage(1)
+  }, [chatFilter])
+
+  useEffect(() => {
+    loadChats(chatPage)
+  }, [chatPage, loadChats])
 
   useEffect(() => {
     loadMessages(selectedChatId)
@@ -299,7 +311,7 @@ const ScrapedChats = ({ setToast }) => {
       await scrapedChatsApi.monitorChats(jidsToMonitor)
       setToast?.({ type: 'success', message: `${jidsToMonitor.length} chat${jidsToMonitor.length > 1 ? 's' : ''} added to monitored chats` })
       setSelectedJids([])
-      await loadChats()
+      await loadChats(chatPage)
     } catch (err) {
       setToast?.({ type: 'error', message: err.message || 'Failed to monitor selected chats' })
     } finally {
@@ -347,7 +359,7 @@ const ScrapedChats = ({ setToast }) => {
 
           <button
             type="button"
-            onClick={loadChats}
+            onClick={() => loadChats(chatPage)}
             disabled={loadingChats}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-700 text-white text-xs font-bold hover:bg-slate-800 dark:hover:bg-slate-600 disabled:opacity-60 transition-colors"
           >
@@ -389,7 +401,10 @@ const ScrapedChats = ({ setToast }) => {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => setChatFilter(item.id)}
+                  onClick={() => {
+                    setChatFilter(item.id)
+                    setChatPage(1)
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
                     chatFilter === item.id
                       ? 'bg-white dark:bg-slate-700 text-emerald-700 dark:text-emerald-300 shadow-sm'
@@ -539,6 +554,33 @@ const ScrapedChats = ({ setToast }) => {
               </div>
             )}
           </div>
+
+          {!loadingChats && chatPagination.totalPages > 1 && (
+            <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-3 bg-white dark:bg-slate-800">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Page {chatPagination.page} of {chatPagination.totalPages}
+                <span className="hidden sm:inline"> · {chatPagination.total} chats</span>
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!chatPagination.hasPrev || loadingChats}
+                  onClick={() => setChatPage(prev => Math.max(prev - 1, 1))}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  disabled={!chatPagination.hasNext || loadingChats}
+                  onClick={() => setChatPage(prev => prev + 1)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className={`bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden flex-col h-[600px] ${
