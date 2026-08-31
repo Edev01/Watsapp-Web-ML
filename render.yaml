@@ -1,0 +1,28 @@
+# Render Background Worker — always-on AI normalizer (no PC required)
+# Create a second Render service from this repo (whats-app-bot), type: Background Worker
+# Start command: python auto_pipeline.py
+
+services:
+  - type: worker
+    name: whatsapp-normalize-worker
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python auto_pipeline.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: LLM_API_KEY
+        sync: false
+      - key: DEFAULT_MODEL
+        value: llama-3.1-8b-instant
+      - key: EMBED_ENABLED
+        value: "false"
+      - key: CHECK_INTERVAL
+        value: "60"
+      - key: NORMALIZE_BATCH_SIZE
+        value: "30"
+      - key: PYTHON_VERSION
+        value: "3.11.9"

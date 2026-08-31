@@ -1,0 +1,15 @@
+.env
+*.env
+!.env.example
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.Python
+logs/
+*.log
+.DS_Store
+node_modules/
+.specstory/
+*.pem
+auto_pipeline.log

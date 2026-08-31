@@ -1,0 +1,203 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', 'Inter', sans-serif;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer utilities {
+  .glass-card {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+
+  .dark .glass-card {
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.08);
+  }
+
+  .glass-input {
+    background: #ffffff;
+    border: 1px solid rgba(203, 213, 225, 0.8);
+  }
+
+  .dark .glass-input {
+    background: #1e293b;
+    border: 1px solid rgba(51, 65, 85, 0.8);
+  }
+
+  /* Force white background on focus & browser autofill */
+  .glass-input:focus {
+    background: #ffffff;
+  }
+
+  .dark .glass-input:focus {
+    background: #1e293b;
+  }
+
+  .glass-input:-webkit-autofill,
+  .glass-input:-webkit-autofill:hover,
+  .glass-input:-webkit-autofill:focus,
+  .glass-input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+    box-shadow: 0 0 0 1000px #ffffff inset !important;
+    -webkit-text-fill-color: #1e293b !important;
+    background-color: #ffffff !important;
+  }
+
+  .dark .glass-input:-webkit-autofill,
+  .dark .glass-input:-webkit-autofill:hover,
+  .dark .glass-input:-webkit-autofill:focus,
+  .dark .glass-input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
+    box-shadow: 0 0 0 1000px #1e293b inset !important;
+    -webkit-text-fill-color: #f8fafc !important;
+    background-color: #1e293b !important;
+  }
+
+  .bg-grid-pattern {
+    background-size: 40px 40px;
+    background-image: 
+      linear-gradient(to right, rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+  }
+
+  .dark .bg-grid-pattern {
+    background-image: 
+      linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  }
+}
+
+/* Custom glow animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.15;
+    filter: blur(40px);
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.25;
+    filter: blur(60px);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 10s infinite ease-in-out;
+}
+
+/* Smooth Transitions */
+* {
+  transition-property: background-color, border-color, text-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Force pointer cursor on all buttons and interactive items */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+select,
+option,
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+/* Floating Labels Utility */
+.floating-group {
+  position: relative;
+  width: 100%;
+}
+
+.floating-label {
+  font-size: 0.875rem;
+  position: absolute;
+  left: 2.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #94a3b8;
+  transform-origin: left top;
+}
+
+.floating-input:focus ~ .floating-label,
+.floating-input:autofill ~ .floating-label,
+.floating-input:-webkit-autofill ~ .floating-label,
+.floating-input:not(:placeholder-shown) ~ .floating-label {
+  transform: translateY(-50%) scale(0.85);
+  top: 0;
+  background-color: #ffffff;
+  padding-left: 6px;
+  padding-right: 6px;
+  color: #059669;
+  font-weight: 600;
+  left: 2.25rem;
+}
+
+.dark .floating-input:focus ~ .floating-label,
+.dark .floating-input:autofill ~ .floating-label,
+.dark .floating-input:-webkit-autofill ~ .floating-label,
+.dark .floating-input:not(:placeholder-shown) ~ .floating-label {
+  background-color: #1e293b;
+  color: #34d399;
+}
+
+.floating-input-error:focus ~ .floating-label,
+.floating-input-error:autofill ~ .floating-label,
+.floating-input-error:-webkit-autofill ~ .floating-label,
+.floating-input-error:not(:placeholder-shown) ~ .floating-label {
+  color: #e11d48 !important;
+}
+
+/* Shimmer Animation for Skeletons */
+@keyframes shimmer-anim {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer-anim 1.5s infinite linear;
+}
+
+.dark .shimmer {
+  background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+}
+
+/* Dropdown & Options styling for readability in Dark/Light themes */
+select {
+  color-scheme: light;
+  color: #1e293b !important;
+}
+
+.dark select {
+  color-scheme: dark;
+  color: #f8fafc !important;
+}
+
+select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.dark select option {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+/* Scrollbar dark mode support */
+html.dark {
+  color-scheme: dark;
+}

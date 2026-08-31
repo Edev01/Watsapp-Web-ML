@@ -1,0 +1,558 @@
+{
+  "info": {
+    "_postman_id": "66d6672a-97bc-4c1f-b211-351c25bfffaa",
+    "name": "scrapper collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "53676935",
+    "_collection_link": "https://go.postman.co/collection/53676935-66d6672a-97bc-4c1f-b211-351c25bfffaa?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "auth",
+      "item": [
+        {
+          "name": "admin signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"admin@example.com\",\n    \"password\": \"AdminPassword123\"\n  }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{scrapper_url}}/api/auth/admin/signup",
+              "host": [
+                "{{scrapper_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "admin",
+                "signup"
+              ]
+            },
+            "description": "Generated from cURL: curl -X POST http://localhost:3000/api/auth/admin/signup \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"email\": \"admin@example.com\",\n    \"password\": \"AdminPassword123\"\n  }'\n"
+          },
+          "response": []
+        },
+        {
+          "name": "login api",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Parse the JSON response",
+                  "const response = pm.response.json();",
+                  "",
+                  "// Check if login was successful (status 200) and contains a token",
+                  "if (pm.response.code === 200 && !response.error && response.data && response.data.token) {",
+                  "    // Save the token as an environment variable",
+                  "    pm.environment.set(\"scrapper_token\", response.data.token);",
+                  "    console.log(\"Success: Token stored in 'scrapper_token' environment variable.\");",
+                  "} else {",
+                  "    console.log(\"Failed to extract token from login response.\");",
+                  "}",
+                  ""
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    // \"email\": \"admin@example.com\",\n    // \"password\": \"AdminPassword123\"\n\n    \"email\": \"user@example.com\",\n    \"password\": \"NewSecurePassword123\"\n  }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{scrapper_url}}/api/auth/login",
+              "host": [
+                "{{scrapper_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Generated from cURL: curl -X POST http://localhost:3000/api/auth/login \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"email\": \"admin@example.com\",\n    \"password\": \"AdminPassword123\"\n  }'\n"
+          },
+          "response": []
+        },
+        {
+          "name": "reset-password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scrapper_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"newPassword\": \"NewSecurePassword123\"\n  }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{scrapper_url}}/api/auth/reset-password",
+              "host": [
+                "{{scrapper_url}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Generated from cURL: curl -X POST http://localhost:3000/api/auth/reset-password \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer YOUR_USER_JWT_TOKEN\" \\\n  -d '{\n    \"newPassword\": \"NewSecurePassword123\"\n  }'\n"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "accounts",
+      "item": [
+        {
+          "name": "create users",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{scrapper_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"john.doe@example.com\",\n    \"password\": \"TemporaryPassword123\",\n    \"name\": \"John Doe\",\n    \"phone_number\": \"+1987654321\"\n  }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{scrapper_url}}/api/users",
+              "host": [
+                "{{scrapper_url}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            },
+            "description": "Generated from cURL: curl -X POST http://localhost:3000/api/users \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer YOUR_ADMIN_JWT_TOKEN\" \\\n  -d '{\n    \"email\": \"user@example.com\",\n    \"password\": \"TempPassword123\"\n  }'\n"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "QR",
+      "item": [
+        {
+          "name": "latest QR (user token only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer YOUR_USER_JWT_TOKEN"
+              }
+            ],
+            "url": {
+              "raw": "{{scrapper_url}}/api/qr/latest",
+              "host": [
+                "{{scrapper_url}}"
+              ],
+              "path": [
+                "api",
+                "qr",
+                "latest"
+              ]
+            },
+            "description": "Generated from cURL: curl -X GET http://localhost:3000/api/qr/latest \\\n  -H \"Authorization: Bearer YOUR_USER_JWT_TOKEN\"\n"
+          },
+          "response": []
+        },
+        {
+          "name": "post QR (for extension - not for zeeshan)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://wa.me/settings/linked_devices#2@znACi2po5L...s=,FwzbCpJz09TdgJnUa7jDDUAm30wxjix6Atvn80AIUy0=\", \n  \"source\": \"inline-canvas\", \n  \"pageUrl\": \"https://web.whatsapp.com/\"\n}\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{scrapper_url}}/api/qr",
+              "host": [
+                "{{scrapper_url}}"
+              ],
+              "path": [
+                "api",
+                "qr"
+              ]
+            },
+            "description": "Generated from cURL: curl -X POST http://localhost:3000/api/qr \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"url\": \"https://example.com/whatsapp-qr.png\",\n    \"source\": \"whatsapp_scrapper\"\n  }'\n"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "whatsapp",
+      "item": [
+        {
+          "name": "get all chats (user token - only recipients are get in this api)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}{",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://scrapper-node-app.onrender.com/api/scraped-chats",
+              "protocol": "https",
+              "host": [
+                "scrapper-node-app",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "scraped-chats"
+              ]
+            },
+            "description": "Generated from cURL: curl -X GET https://scrapper-node-app.onrender.com/api/scraped-chats\n"
+          },
+          "response": []
+        },
+        {
+          "name": "get chats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://scrapper-node-app.onrender.com/api/scraped-chats/messages?chatId=updates@c.us",
+              "protocol": "https",
+              "host": [
+                "scrapper-node-app",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "scraped-chats",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "chatId",
+                  "value": "updates@c.us"
+                }
+              ]
+            },
+            "description": "Generated from cURL: curl -X GET \"https://scrapper-node-app.onrender.com/api/scraped-chats/messages?chatId=1234567890@c.us\"\n"
+          },
+          "response": []
+        },
+        {
+          "name": "select recipients ",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"jids\": [ \"updates@c.us\"]\n  }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "https://scrapper-node-app.onrender.com/api/scraped-chats/monitor",
+              "protocol": "https",
+              "host": [
+                "scrapper-node-app",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "scraped-chats",
+                "monitor"
+              ]
+            },
+            "description": "Generated from cURL: curl -X POST https://scrapper-node-app.onrender.com/api/scraped-chats/monitor \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"jids\": [\"1234567890@c.us\", \"9876543210@c.us\"]\n  }'\n"
+          },
+          "response": []
+        },
+        {
+          "name": "get monitored chats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://scrapper-node-app.onrender.com/api/scraped-chats/monitored",
+              "protocol": "https",
+              "host": [
+                "scrapper-node-app",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "scraped-chats",
+                "monitored"
+              ]
+            },
+            "description": "Generated from cURL: curl -X GET https://scrapper-node-app.onrender.com/api/scraped-chats/monitored\n"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "ML",
+      "item": [
+        {
+          "name": "get messages from specific realtor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://scrapper-node-app.onrender.com/api/ml/dataset?chatId=dha_bungalows@c.us&limit=500",
+              "protocol": "https",
+              "host": [
+                "scrapper-node-app",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "ml",
+                "dataset"
+              ],
+              "query": [
+                {
+                  "key": "chatId",
+                  "value": "dha_bungalows@c.us"
+                },
+                {
+                  "key": "limit",
+                  "value": "500"
+                }
+              ]
+            },
+            "description": "Generated from cURL: curl -X GET \"https://scrapper-node-app.onrender.com/api/ml/dataset?chatId=dha_bungalows@c.us&limit=500\"\n"
+          },
+          "response": []
+        },
+        {
+          "name": "get messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://scrapper-node-app.onrender.com/api/ml/dataset?limit=1000&offset=1000",
+              "protocol": "https",
+              "host": [
+                "scrapper-node-app",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "ml",
+                "dataset"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "1000"
+                },
+                {
+                  "key": "offset",
+                  "value": "1000"
+                }
+              ]
+            },
+            "description": "Generated from cURL: curl -X GET \"https://scrapper-node-app.onrender.com/api/ml/dataset?limit=1000&offset=1000\"\n"
+          },
+          "response": []
+        },
+        {
+          "name": "get all realtors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://scrapper-node-app.onrender.com/api/realtors",
+              "protocol": "https",
+              "host": [
+                "scrapper-node-app",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "realtors"
+              ]
+            },
+            "description": "Generated from cURL: curl -X GET \"https://scrapper-node-app.onrender.com/api/realtors\"\n"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "properrty",
+      "item": [
+        {
+          "name": "properties filter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"filters\": {\n      \"purpose\": \"Buy\",\n      \"city\": \"Karachi\",\n      \"location\": \"Scheme 33\",\n      \"sortBy\": \"Newest First\",\n      \"priceMin\": \"\",\n      \"priceMax\": \"15000000\",\n      \"propertyType\": \"House\",\n      \"propertySubType\": \"Double Storey\",\n      \"areaUnit\": \"Marla\",\n      \"areaMin\": \"5\",\n      \"areaMax\": \"10\"\n    }\n  }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "https://scrapper-node-app.onrender.com/api/properties/filter",
+              "protocol": "https",
+              "host": [
+                "scrapper-node-app",
+                "onrender",
+                "com"
+              ],
+              "path": [
+                "api",
+                "properties",
+                "filter"
+              ]
+            },
+            "description": "Generated from cURL: curl -X POST http://localhost:3000/api/properties/filter \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"filters\": {\n      \"purpose\": \"Buy\",\n      \"city\": \"Karachi\",\n      \"location\": \"Scheme 33\",\n      \"sortBy\": \"Newest First\",\n      \"priceMin\": \"\",\n      \"priceMax\": \"15000000\",\n      \"propertyType\": \"House\",\n      \"propertySubType\": \"Double Storey\",\n      \"areaUnit\": \"Marla\",\n      \"areaMin\": \"5\",\n      \"areaMax\": \"10\"\n    }\n  }'\n"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "scrapper_url",
+      "value": ""
+    },
+    {
+      "key": "scrapper_token",
+      "value": ""
+    }
+  ]
+}
