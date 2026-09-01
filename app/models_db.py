@@ -48,6 +48,7 @@ class NormalizedMessage(Base):
     price = Column(String, nullable=True)
     price_value = Column(Float, nullable=True)
     contact_number = Column(String, nullable=True)
+    property_status = Column(String, nullable=True, default="AVAILABLE", index=True)
     confidence_score = Column(Float, default=1.0)
     model_used = Column(String, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)

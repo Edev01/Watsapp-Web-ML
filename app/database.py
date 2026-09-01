@@ -91,6 +91,7 @@ def _init_db_locked(*, skip_if_busy: bool = False) -> bool:
         "ALTER TABLE normalized_messages ADD COLUMN IF NOT EXISTS size VARCHAR;",
         "ALTER TABLE normalized_messages ADD COLUMN IF NOT EXISTS price VARCHAR;",
         "ALTER TABLE normalized_messages ADD COLUMN IF NOT EXISTS contact_number VARCHAR;",
+        "ALTER TABLE normalized_messages ADD COLUMN IF NOT EXISTS property_status VARCHAR(32) DEFAULT 'AVAILABLE';",
         "ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS user_id INTEGER DEFAULT 1;",
         "ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS from_me BOOLEAN DEFAULT FALSE;",
     ]

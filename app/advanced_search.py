@@ -28,6 +28,39 @@ logger = logging.getLogger("whatsapp_ai.advanced_search")
 DEFAULT_LLM_MODEL = os.getenv("DEFAULT_MODEL", "openai/gpt-oss-20b")
 DEFAULT_EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
 
+PROPERTY_STATUSES = frozenset(
+    {"AVAILABLE", "SOLD", "RENTED", "RESERVED", "WITHDRAWN", "ON_HOLD"}
+)
+
+
+def _normalize_property_status(raw: Optional[str]) -> Optional[str]:
+    if raw is None or not str(raw).strip():
+        return None
+    key = str(raw).strip().upper().replace(" ", "_").replace("-", "_")
+    aliases = {
+        "ACTIVE": "AVAILABLE",
+        "OPEN": "AVAILABLE",
+        "PENDING": "ON_HOLD",
+        "HOLD": "ON_HOLD",
+        "REMOVED": "WITHDRAWN",
+        "INACTIVE": "WITHDRAWN",
+        "LEASED": "RENTED",
+    }
+    if key in PROPERTY_STATUSES:
+        return key
+    return aliases.get(key)
+
+
+def _parse_status_filter(raw: Optional[str]) -> List[str]:
+    if not raw or not str(raw).strip():
+        return []
+    out = []
+    for part in str(raw).split(","):
+        normalized = _normalize_property_status(part)
+        if normalized and normalized not in out:
+            out.append(normalized)
+    return out
+
 
 def _try_query_embedding(query: str, embedding_model: str) -> Optional[List[float]]:
     if not embeddings_enabled():
@@ -72,6 +105,7 @@ def advanced_property_search(
     area_unit: Optional[str] = None,  # "Marla", "Kanal", "Sq. Ft.", "Sq. Yd."
     area_min: Optional[float] = None,  # Minimum area value
     area_max: Optional[float] = None,  # Maximum area value
+    status: Optional[str] = None,  # AVAILABLE | SOLD | RENTED | ...
     limit: int = 10,
 ) -> List[Dict[str, Any]]:
     """
@@ -237,6 +271,17 @@ def advanced_property_search(
         filters.append("n.size_unit ILIKE :area_unit")
         params["area_unit"] = f"%{area_unit.split('.')[0].strip()}%"
 
+    status_list = _parse_status_filter(status)
+    if status_list:
+        placeholders = []
+        for i, st in enumerate(status_list):
+            key = f"status_{i}"
+            placeholders.append(f":{key}")
+            params[key] = st
+        filters.append(
+            f"UPPER(COALESCE(n.property_status, 'AVAILABLE')) IN ({', '.join(placeholders)})"
+        )
+
     where_clause = " AND ".join(filters)
 
     # Determine sort order
@@ -267,6 +312,7 @@ def advanced_property_search(
             SELECT * FROM (
                 SELECT DISTINCT ON (m.id)
                     m.id AS message_id,
+                    n.id AS property_id,
                     m.user_id,
                     m.message AS raw_message,
                     n.summary,
@@ -282,6 +328,7 @@ def advanced_property_search(
                     n.price,
                     n.price_value,
                     n.contact_number,
+                    n.property_status,
                     n.category,
                     n.intent,
                     n.sentiment,
@@ -313,6 +360,7 @@ def advanced_property_search(
             SELECT * FROM (
                 SELECT DISTINCT ON (m.id)
                     m.id AS message_id,
+                    n.id AS property_id,
                     m.user_id,
                     m.message AS raw_message,
                     n.summary,
@@ -328,6 +376,7 @@ def advanced_property_search(
                     n.price,
                     n.price_value,
                     n.contact_number,
+                    n.property_status,
                     n.category,
                     n.intent,
                     n.sentiment,
@@ -348,6 +397,7 @@ def advanced_property_search(
             SELECT * FROM (
                 SELECT DISTINCT ON (m.id)
                     m.id AS message_id,
+                    n.id AS property_id,
                     m.user_id,
                     m.message AS raw_message,
                     n.summary,
@@ -363,6 +413,7 @@ def advanced_property_search(
                     n.price,
                     n.price_value,
                     n.contact_number,
+                    n.property_status,
                     n.category,
                     n.intent,
                     n.sentiment,
@@ -385,6 +436,8 @@ def advanced_property_search(
     for r in results:
         formatted_results.append({
             "message_id": r["message_id"],
+            "property_id": r.get("property_id"),
+            "id": r.get("property_id"),
             "user_id": r["user_id"],
             "raw_message": r["raw_message"],
             "summary": r["summary"],
@@ -400,6 +453,8 @@ def advanced_property_search(
             "price": r["price"],
             "price_value": r["price_value"],
             "contact_number": r["contact_number"],
+            "property_status": (r.get("property_status") or "AVAILABLE").upper(),
+            "propertyStatus": (r.get("property_status") or "AVAILABLE").upper(),
             "category": r["category"],
             "intent": r["intent"],
             "sentiment": r["sentiment"],

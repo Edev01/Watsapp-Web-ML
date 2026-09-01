@@ -67,6 +67,8 @@ class DashboardSearchRequest(BaseModel):
     areaUnit: Optional[str] = None
     areaMin: Optional[float] = None
     areaMax: Optional[float] = None
+    status: Optional[str] = None
+    propertyStatus: Optional[str] = None
     userId: Optional[int] = None
     user_id: Optional[int] = None
     limit: int = 20
@@ -145,6 +147,7 @@ def api_dashboard_search(
             area_unit=req.areaUnit,
             area_min=req.areaMin,
             area_max=req.areaMax,
+            status=req.status or req.propertyStatus,
             limit=req.limit,
         )
 
