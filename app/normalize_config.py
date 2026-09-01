@@ -42,7 +42,7 @@ def recommended_check_interval() -> int:
     raw = os.getenv("CHECK_INTERVAL", "").strip()
     if raw:
         return int(raw)
-    return 60 if is_local_llm() else 15
+    return 60 if is_local_llm() else 10
 
 
 def embeddings_enabled() -> bool:

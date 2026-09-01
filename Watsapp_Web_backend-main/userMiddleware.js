@@ -1,14 +1,12 @@
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_123!';
+
 /**
- * Middleware to extract target user_id for multi-tenant data isolation.
- * Order of preference:
- * 1. Verified JWT Bearer token payload (req.user.id)
- * 2. Custom header (x-user-id)
- * 3. Request body (req.body.userId or req.body.user_id)
- * 4. Request query parameter (req.query.userId or req.query.user_id)
- * 5. Default fallback ID (1)
+ * Resolve tenant user id for multi-tenant data isolation.
+ * Priority: verified JWT > x-user-id header > body/query (only when no JWT).
+ * Never defaults to user 1 — missing auth leaves req.userId unset.
  */
 const extractUserId = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -17,32 +15,55 @@ const extractUserId = (req, res, next) => {
   const bodyId = req.body?.userId || req.body?.user_id;
   const queryId = req.query?.userId || req.query?.user_id;
 
+  const applyUserId = (id) => {
+    const parsed = parseInt(id, 10);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      req.userId = parsed;
+    }
+  };
+
   if (token) {
-    jwt.verify(token, process.env.JWT_SECRET || 'super_secret_jwt_key_123!', (err, user) => {
+    jwt.verify(token, JWT_SECRET, (err, user) => {
       if (!err && user && user.id) {
+        req.user = user;
         req.userId = parseInt(user.id, 10);
       } else if (customHeader) {
-        req.userId = parseInt(customHeader, 10);
+        applyUserId(customHeader);
       } else if (bodyId) {
-        req.userId = parseInt(bodyId, 10);
+        applyUserId(bodyId);
       } else if (queryId) {
-        req.userId = parseInt(queryId, 10);
-      } else {
-        req.userId = 1;
+        applyUserId(queryId);
       }
       next();
     });
-  } else {
-    const fallbackId = customHeader || bodyId || queryId;
-    if (fallbackId && !isNaN(parseInt(fallbackId, 10))) {
-      req.userId = parseInt(fallbackId, 10);
-    } else {
-      req.userId = 1;
-    }
-    next();
+    return;
   }
+
+  if (customHeader) {
+    applyUserId(customHeader);
+  } else if (bodyId) {
+    applyUserId(bodyId);
+  } else if (queryId) {
+    applyUserId(queryId);
+  }
+  next();
+};
+
+/** Require a resolved tenant id (use after authenticateToken or extractUserId). */
+const requireUserId = (req, res, next) => {
+  const userId = req.user?.id || req.userId;
+  if (!userId) {
+    return res.status(401).json({
+      error: true,
+      message: 'Authentication required',
+      data: null,
+    });
+  }
+  req.userId = parseInt(userId, 10);
+  next();
 };
 
 module.exports = {
-  extractUserId
+  extractUserId,
+  requireUserId,
 };

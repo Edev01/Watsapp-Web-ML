@@ -112,6 +112,9 @@ def advanced_property_search(
     Advanced property search with user data isolation & dashboard filters.
     """
     
+    if user_id is None:
+        raise ValueError("user_id is required for tenant-isolated property search")
+
     logger.info(f"Advanced search initiated for user_id={user_id} with filters:")
     logger.info(f"  Query: {query_text}")
     logger.info(f"  Purpose: {purpose}, City: {city}, Location: {location}")
@@ -176,9 +179,8 @@ def advanced_property_search(
     filters = ["n.is_property = true"]
     params = {"limit": limit}
 
-    if user_id is not None:
-        filters.append("m.user_id = :user_id")
-        params["user_id"] = user_id
+    filters.append("m.user_id = :user_id")
+    params["user_id"] = user_id
 
     if model_used:
         filters.append("n.model_used = :model_used")

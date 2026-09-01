@@ -317,6 +317,7 @@ def _load_pending_jobs(
     skipped_ids: set,
     user_id: Optional[int],
     window: int,
+    newest_first: bool = False,
 ) -> List[RawJob]:
     processed_ids_stmt = (
         select(NormalizedMessage.whatsapp_message_id)
@@ -332,7 +333,9 @@ def _load_pending_jobs(
         .filter(WhatsAppMessage.id.not_in(processed_ids_stmt))
         .filter(WhatsAppMessage.id.not_in(active_claims_stmt))
         .filter(WhatsAppMessage.message.isnot(None))
-        .order_by(WhatsAppMessage.id.asc())
+        .order_by(
+            WhatsAppMessage.id.desc() if newest_first else WhatsAppMessage.id.asc()
+        )
     )
     if user_id is not None:
         if user_id == 1:
@@ -371,6 +374,7 @@ def process_unnormalized_messages(
     batch_size: int = 50,
     user_id: Optional[int] = None,
     concurrency: Optional[int] = None,
+    newest_first: bool = False,
 ) -> int:
     """
     Normalize pending WhatsApp messages with parallel Groq calls.
@@ -395,7 +399,9 @@ def process_unnormalized_messages(
     _release_stale_claims(db, target_model)
 
     window = max(batch_size * 4, 80)
-    candidates = _load_pending_jobs(db, target_model, skipped_ids, user_id, window)
+    candidates = _load_pending_jobs(
+        db, target_model, skipped_ids, user_id, window, newest_first=newest_first
+    )
     selected = _fair_pick(candidates, batch_size, per_user)
     claimed = _claim_jobs(db, selected, target_model)
 

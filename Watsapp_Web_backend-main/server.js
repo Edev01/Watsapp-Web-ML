@@ -8,13 +8,29 @@ const db = require('./db');
 const { sendResponse } = require('./responseHelper');
 const { authenticateToken, isAdmin } = require('./middleware');
 const { filterAndSortProperties } = require('./propertyHelper');
-const { extractUserId } = require('./userMiddleware');
+const { extractUserId, requireUserId } = require('./userMiddleware');
 const { findOrCreateCanonicalChat, cleanText, isSystemNotificationText } = require('./contactHelper');
 
 const http = require('http');
 const { Server } = require('socket.io');
 const axios = require('axios');
-const PYTHON_AI_URL = process.env.PYTHON_AI_URL || 'http://localhost:8000';
+const PYTHON_AI_URL = (() => {
+  const raw = process.env.PYTHON_AI_URL || 'http://localhost:8000';
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  return `https://${raw}`;
+})();
+
+function resolveTenantUserId(req, res, { allowBody = true } = {}) {
+  let userId = req.user?.id || req.userId;
+  if (!userId && allowBody) {
+    userId = req.body?.userId || req.body?.user_id || req.query?.userId || req.query?.user_id;
+  }
+  if (!userId) {
+    sendResponse(res, 401, true, null, 'Authentication required');
+    return null;
+  }
+  return parseInt(userId, 10);
+}
 
 function wakePythonPipeline(userId) {
   axios
@@ -241,7 +257,8 @@ app.post('/api/auth/reset-password', authenticateToken, async (req, res) => {
 // 5. Post QR URL
 app.post('/api/qr', async (req, res) => {
   const { url, source, pageUrl } = req.body;
-  const userId = req.userId || req.body.userId || req.body.user_id || 1;
+  const userId = resolveTenantUserId(req, res);
+  if (userId === null) return;
 
   if (!url) {
     return sendResponse(res, 400, true, null, 'URL is required');
@@ -281,7 +298,8 @@ app.post('/api/qr/status', async (req, res) => {
 
 // 6. Get Latest QR URL
 app.get('/api/qr/latest', async (req, res) => {
-  const userId = req.userId || req.query.userId || req.query.user_id || 1;
+  const userId = resolveTenantUserId(req, res);
+  if (userId === null) return;
   try {
     const result = await db.query(
       'SELECT id, url, source, page_url, user_id, created_at FROM qr_codes WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
@@ -311,8 +329,9 @@ async function stampMonitoredScrapePause(userId) {
   return result.rowCount;
 }
 
-function parseChatListQuery(req) {
-  const userId = req.userId || req.query.userId || req.query.user_id || 1;
+function parseChatListQuery(req, res) {
+  const userId = resolveTenantUserId(req, res);
+  if (userId === null) return null;
   const rawType = String(req.query.type || req.query.filter || 'all').toLowerCase();
   const type = ['monitored', 'chats', 'all'].includes(rawType) ? rawType : 'all';
   const search = String(req.query.search || req.query.q || '').trim();
@@ -346,7 +365,8 @@ function buildChatListSql({ userId, type, search }) {
 // 7. Post Scraped Contacts List (Deduplicated by name & JID with canonical matching)
 app.post('/api/scraped-chats/contacts', async (req, res) => {
   const { contacts } = req.body;
-  const userId = req.userId || req.body.userId || req.body.user_id || 1;
+  const userId = resolveTenantUserId(req, res);
+  if (userId === null) return;
   if (!Array.isArray(contacts)) {
     return sendResponse(res, 400, true, null, 'Contacts array is required');
   }
@@ -364,7 +384,8 @@ app.post('/api/scraped-chats/contacts', async (req, res) => {
 
 // 8. Get Monitored Chats list (Includes last_scraped_timestamp for incremental sync)
 app.get('/api/scraped-chats/monitored', async (req, res) => {
-  const userId = req.userId || req.query.userId || req.query.user_id || 1;
+  const userId = resolveTenantUserId(req, res);
+  if (userId === null) return;
   try {
     const result = await db.query(
       `SELECT c.jid, c.name, c.avatar, c.is_monitored, c.user_id, c.created_at,
@@ -385,7 +406,8 @@ app.get('/api/scraped-chats/monitored', async (req, res) => {
 // 9. Post Scraped Chat Messages (Canonical JID matching to prevent duplicate recipient creation)
 app.post('/api/scraped-chats/messages', async (req, res) => {
   const { chatId, chatName, messages } = req.body;
-  const userId = req.userId || req.body.userId || req.body.user_id || 1;
+  const userId = resolveTenantUserId(req, res);
+  if (userId === null) return;
   if ((!chatId && !chatName) || !Array.isArray(messages)) {
     return sendResponse(res, 400, true, null, 'chatId or chatName and messages array are required');
   }
@@ -445,7 +467,8 @@ app.post('/api/scraped-chats/messages', async (req, res) => {
 // 10. Toggle Monitored Status for Chats
 app.post('/api/scraped-chats/monitor', async (req, res) => {
   const { jids } = req.body;
-  const userId = req.userId || req.body.userId || req.body.user_id || 1;
+  const userId = resolveTenantUserId(req, res);
+  if (userId === null) return;
   if (!Array.isArray(jids)) {
     return sendResponse(res, 400, true, null, 'jids array is required');
   }
@@ -467,7 +490,9 @@ app.post('/api/scraped-chats/monitor', async (req, res) => {
 
 // 11. Get chats (type=monitored|chats|all — full list, no pagination)
 app.get('/api/scraped-chats', async (req, res) => {
-  const { userId, type, search } = parseChatListQuery(req);
+  const parsed = parseChatListQuery(req, res);
+  if (!parsed) return;
+  const { userId, type, search } = parsed;
   try {
     const { sql, params } = buildChatListSql({ userId, type, search });
     const result = await db.query(sql, params);
@@ -491,7 +516,8 @@ app.get('/api/scraped-chats', async (req, res) => {
 
 // 11a. Lightweight chat counts
 app.get('/api/scraped-chats/stats', async (req, res) => {
-  const userId = req.userId || req.query.userId || req.query.user_id || 1;
+  const userId = resolveTenantUserId(req, res);
+  if (userId === null) return;
   try {
     const result = await db.query(
       `SELECT
@@ -533,7 +559,8 @@ app.post('/api/scraped-chats/pause-scraping', async (req, res) => {
 
 // 11b. Get All Realtors List (Includes total message counts & identifiers for user)
 app.get('/api/realtors', async (req, res) => {
-  const userId = req.userId || req.query.userId || req.query.user_id || 1;
+  const userId = resolveTenantUserId(req, res);
+  if (userId === null) return;
   try {
     const result = await db.query(
       `SELECT c.id, c.jid, c.name, c.avatar, c.is_monitored, c.user_id, c.created_at,
@@ -554,7 +581,8 @@ app.get('/api/realtors', async (req, res) => {
 
 // 12. Get Messages for a Specific Chat / Realtor (Supports chatId, jid, or name query params)
 app.get('/api/scraped-chats/messages', async (req, res) => {
-  const userId = req.userId || req.query.userId || req.query.user_id || 1;
+  const userId = resolveTenantUserId(req, res);
+  if (userId === null) return;
   const { chatId, jid, name } = req.query;
   const targetId = chatId || jid;
 
@@ -679,9 +707,10 @@ const handlePropertyFilter = async (req, res) => {
       areaMax: rawFilters.areaMax ?? queryFilters.areaMax ?? ''
     };
 
-    const userId = req.userId || rawFilters.userId || rawFilters.user_id || queryFilters.userId || queryFilters.user_id || 1;
+    const userId = resolveTenantUserId(req, res);
+    if (userId === null) return;
 
-    // Use user's search text if provided, otherwise build from filters
+    const authHeader = req.headers['authorization'];
     let searchQuery = '';
     if (userSearchText && userSearchText.trim()) {
       // User typed something in search bar - use it directly!
@@ -724,7 +753,9 @@ const handlePropertyFilter = async (req, res) => {
       }, {
         timeout: 30000, // 30 second timeout
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(authHeader ? { Authorization: authHeader } : {}),
+          'x-user-id': String(userId),
         }
       });
 
@@ -853,10 +884,10 @@ const handlePropertyFilter = async (req, res) => {
   }
 };
 
-app.post('/api/properties/filter', handlePropertyFilter);
-app.get('/api/properties/filter', handlePropertyFilter);
-app.post('/api/properties', handlePropertyFilter);
-app.get('/api/properties', handlePropertyFilter);
+app.post('/api/properties/filter', authenticateToken, requireUserId, handlePropertyFilter);
+app.get('/api/properties/filter', authenticateToken, requireUserId, handlePropertyFilter);
+app.post('/api/properties', authenticateToken, requireUserId, handlePropertyFilter);
+app.get('/api/properties', authenticateToken, requireUserId, handlePropertyFilter);
 
 // Root Route
 app.get('/', (req, res) => {

@@ -107,6 +107,35 @@ def api_process_now(req: ProcessNowRequest = ProcessNowRequest()):
     return {"success": True, "queued": True, "user_id": req.user_id}
 
 
+def _resolve_dashboard_user_id(
+    req: DashboardSearchRequest,
+    authorization: Optional[str],
+    x_user_id: Optional[str],
+) -> int:
+    """Resolve tenant id — JWT/header wins over body to prevent cross-tenant spoofing."""
+    token_user_id = extract_user_id_from_token(authorization) if authorization else None
+    header_user_id: Optional[int] = None
+    if x_user_id:
+        try:
+            header_user_id = int(x_user_id)
+        except ValueError:
+            pass
+
+    body_user_id = req.userId if req.userId is not None else req.user_id
+
+    effective_user_id = token_user_id or header_user_id or body_user_id
+    if effective_user_id is None:
+        raise HTTPException(status_code=401, detail="user_id is required for dashboard search")
+
+    effective_user_id = int(effective_user_id)
+
+    for other_id in (token_user_id, header_user_id, body_user_id):
+        if other_id is not None and int(other_id) != effective_user_id:
+            raise HTTPException(status_code=403, detail="user_id does not match authenticated user")
+
+    return effective_user_id
+
+
 @app.post("/api/dashboard-search")
 def api_dashboard_search(
     req: DashboardSearchRequest,
@@ -115,16 +144,7 @@ def api_dashboard_search(
 ):
     db = SessionLocal()
     try:
-        effective_user_id = req.userId if req.userId is not None else req.user_id
-
-        if effective_user_id is None and x_user_id:
-            try:
-                effective_user_id = int(x_user_id)
-            except ValueError:
-                pass
-
-        if effective_user_id is None and authorization:
-            effective_user_id = extract_user_id_from_token(authorization)
+        effective_user_id = _resolve_dashboard_user_id(req, authorization, x_user_id)
 
         logger.info(
             f"Dashboard search request: user_id={effective_user_id}, city={req.city}, "
@@ -159,6 +179,10 @@ def api_dashboard_search(
             "results": results,
         }
 
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e)) from e
     except Exception as e:
         logger.error(f"Dashboard search error: {e}")
         return {
